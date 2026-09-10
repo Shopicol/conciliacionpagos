@@ -56,8 +56,21 @@
       <form id="reconciliationForm" class="recon-form">
         <div class="form-row">
           <label>
+            <span>Negocio *</span>
+            <select id="fieldBusiness" required>
+              <option value="mayoristas">Mayoristas</option>
+              <option value="shopicol">Shopicol</option>
+            </select>
+          </label>
+          <label>
             <span>Fecha</span>
             <input type="date" id="fieldDate" required>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            <span>Número de factura</span>
+            <input type="text" id="fieldInvoiceNumber" placeholder="Opcional">
           </label>
           <label>
             <span>Referencia (6 dígitos) *</span>
@@ -66,9 +79,15 @@
         </div>
         <div class="form-row">
           <label>
+            <span>Monto en Bs</span>
+            <input type="number" id="fieldAmountBs" step="0.01" min="0" placeholder="Ej: 50140.00">
+          </label>
+          <label>
             <span>Monto (USD) *</span>
             <input type="number" id="fieldAmount" step="0.01" min="0.01" required placeholder="Ej: 54.50">
           </label>
+        </div>
+        <div class="form-row">
           <label>
             <span>Método *</span>
             <select id="fieldType" required>
@@ -98,19 +117,53 @@
       </form>
     </section>
 
+    <!-- ---- Totales por día ---- -->
+    <section class="card">
+      <h2>📊 Totales por día</h2>
+      <p class="sub-note">Se calcula con los filtros que tengas activos abajo.</p>
+      <div class="table-wrap">
+        <table id="dailyTotalsTable">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Cantidad de pagos</th>
+              <th>Total en Bs</th>
+              <th>Total en $</th>
+            </tr>
+          </thead>
+          <tbody id="dailyTotalsBody"></tbody>
+        </table>
+        <p class="empty-state" id="dailyTotalsEmpty" hidden>No hay pagos para mostrar totales.</p>
+      </div>
+    </section>
+
     <!-- ---- Historial ---- -->
     <section class="card">
       <div class="card-header">
         <h2>📋 Pagos registrados</h2>
-        <input type="text" id="searchInput" placeholder="Buscar por referencia, cliente...">
+        <div class="filters-group">
+          <select id="businessFilter">
+            <option value="">Ambos negocios</option>
+            <option value="mayoristas">Mayoristas</option>
+            <option value="shopicol">Shopicol</option>
+          </select>
+          <select id="asesoraFilter">
+            <option value="">Todas las asesoras</option>
+          </select>
+          <input type="text" id="searchInput" placeholder="Buscar por referencia, cliente...">
+          <button type="button" id="exportExcelBtn">⬇ Excel</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="reconciliationsTable">
           <thead>
             <tr>
+              <th>Negocio</th>
               <th>Fecha</th>
+              <th>N° Factura</th>
               <th>Referencia</th>
-              <th>Monto</th>
+              <th>Monto Bs</th>
+              <th>Monto $</th>
               <th>Método</th>
               <th>Cliente</th>
               <th>Registrado por</th>
@@ -186,6 +239,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

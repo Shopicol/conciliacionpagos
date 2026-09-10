@@ -20,8 +20,11 @@
     accountsList: document.getElementById("accountsList"),
 
     reconciliationForm: document.getElementById("reconciliationForm"),
+    fieldBusiness: document.getElementById("fieldBusiness"),
     fieldDate: document.getElementById("fieldDate"),
+    fieldInvoiceNumber: document.getElementById("fieldInvoiceNumber"),
     fieldReference: document.getElementById("fieldReference"),
+    fieldAmountBs: document.getElementById("fieldAmountBs"),
     fieldAmount: document.getElementById("fieldAmount"),
     fieldType: document.getElementById("fieldType"),
     fieldCustomerName: document.getElementById("fieldCustomerName"),
@@ -31,8 +34,13 @@
     reconciliationMessage: document.getElementById("reconciliationMessage"),
 
     searchInput: document.getElementById("searchInput"),
+    asesoraFilter: document.getElementById("asesoraFilter"),
+    businessFilter: document.getElementById("businessFilter"),
+    exportExcelBtn: document.getElementById("exportExcelBtn"),
     reconciliationsBody: document.getElementById("reconciliationsBody"),
     emptyState: document.getElementById("emptyState"),
+    dailyTotalsBody: document.getElementById("dailyTotalsBody"),
+    dailyTotalsEmpty: document.getElementById("dailyTotalsEmpty"),
 
     accountModalOverlay: document.getElementById("accountModalOverlay"),
     accountModalTitle: document.getElementById("accountModalTitle"),
@@ -53,6 +61,7 @@
   };
 
   const TYPE_LABELS = { pago_movil: "Pago Móvil", binance: "Binance", zelle: "Zelle", otro: "Otro" };
+  const BUSINESS_LABELS = { mayoristas: "Mayoristas", shopicol: "Shopicol" };
 
   let currentProfile = null;
   let allProfiles = {}; // id -> full_name
@@ -142,9 +151,18 @@
      Perfiles (para mostrar "registrado por")
      --------------------------------------------------------------- */
   async function loadProfiles() {
-    const { data } = await supabaseClient.from("profiles").select("id, full_name");
+    const { data } = await supabaseClient.from("profiles").select("id, full_name").order("full_name");
     allProfiles = {};
     (data || []).forEach((p) => (allProfiles[p.id] = p.full_name));
+    populateAsesoraFilter(data || []);
+  }
+
+  function populateAsesoraFilter(profiles) {
+    const current = el.asesoraFilter.value;
+    el.asesoraFilter.innerHTML =
+      `<option value="">Todas las asesoras</option>` +
+      profiles.map((p) => `<option value="${p.id}">${p.full_name}</option>`).join("");
+    el.asesoraFilter.value = current;
   }
 
   /* ---------------------------------------------------------------
@@ -287,8 +305,11 @@
     el.saveReconciliationBtn.textContent = "Guardando…";
 
     const payload = {
+      business: el.fieldBusiness.value,
       payment_date: el.fieldDate.value,
+      invoice_number: el.fieldInvoiceNumber.value.trim(),
       reference,
+      amount_bs: parseFloat(el.fieldAmountBs.value) || 0,
       amount: parseFloat(el.fieldAmount.value),
       payment_type: el.fieldType.value,
       customer_name: el.fieldCustomerName.value.trim(),
@@ -340,17 +361,36 @@
     renderReconciliations();
   }
 
-  function renderReconciliations(filter) {
+  function getFilteredReconciliations() {
     let list = allReconciliations;
-    if (filter) {
-      const q = filter.toLowerCase();
+
+    const asesoraId = el.asesoraFilter.value;
+    if (asesoraId) {
+      list = list.filter((r) => r.entered_by === asesoraId);
+    }
+
+    const business = el.businessFilter.value;
+    if (business) {
+      list = list.filter((r) => r.business === business);
+    }
+
+    const q = el.searchInput.value.trim().toLowerCase();
+    if (q) {
       list = list.filter(
         (r) =>
           r.reference.includes(q) ||
+          (r.invoice_number || "").toLowerCase().includes(q) ||
           (r.customer_name || "").toLowerCase().includes(q) ||
           (r.customer_phone || "").includes(q)
       );
     }
+
+    return list;
+  }
+
+  function renderReconciliations() {
+    const list = getFilteredReconciliations();
+    renderDailyTotals(list);
 
     if (!list.length) {
       el.reconciliationsBody.innerHTML = "";
@@ -362,8 +402,11 @@
       .map(
         (r) => `
         <tr>
+          <td>${BUSINESS_LABELS[r.business] || "—"}</td>
           <td>${r.payment_date}</td>
+          <td>${r.invoice_number || "—"}</td>
           <td class="ref-cell">${r.reference}</td>
+          <td>${r.amount_bs ? moneyBs(r.amount_bs) : "—"}</td>
           <td>${money(r.amount)}</td>
           <td>${TYPE_LABELS[r.payment_type]}</td>
           <td>${r.customer_name || "—"}</td>
@@ -374,8 +417,84 @@
       .join("");
   }
 
-  el.searchInput.addEventListener("input", () => {
-    renderReconciliations(el.searchInput.value.trim());
+  function moneyBs(n) {
+    return "Bs " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function groupTotalsByDay(list) {
+    const groups = {};
+    list.forEach((r) => {
+      const day = r.payment_date;
+      if (!groups[day]) groups[day] = { count: 0, totalBs: 0, totalUsd: 0 };
+      groups[day].count += 1;
+      groups[day].totalBs += Number(r.amount_bs) || 0;
+      groups[day].totalUsd += Number(r.amount) || 0;
+    });
+    return Object.entries(groups)
+      .map(([day, totals]) => ({ day, ...totals }))
+      .sort((a, b) => (a.day < b.day ? 1 : -1)); // más reciente primero
+  }
+
+  function renderDailyTotals(list) {
+    const groups = groupTotalsByDay(list);
+    if (!groups.length) {
+      el.dailyTotalsBody.innerHTML = "";
+      el.dailyTotalsEmpty.hidden = false;
+      return;
+    }
+    el.dailyTotalsEmpty.hidden = true;
+    el.dailyTotalsBody.innerHTML = groups
+      .map(
+        (g) => `
+        <tr>
+          <td>${g.day}</td>
+          <td>${g.count}</td>
+          <td>${moneyBs(g.totalBs)}</td>
+          <td>${money(g.totalUsd)}</td>
+        </tr>
+      `
+      )
+      .join("");
+  }
+
+  el.searchInput.addEventListener("input", () => renderReconciliations());
+  el.asesoraFilter.addEventListener("change", () => renderReconciliations());
+  el.businessFilter.addEventListener("change", () => renderReconciliations());
+
+  /* ---------------------------------------------------------------
+     Exportar a Excel — respeta los filtros que estén activos
+     --------------------------------------------------------------- */
+  el.exportExcelBtn.addEventListener("click", () => {
+    const list = getFilteredReconciliations();
+    if (!list.length) {
+      alert("No hay pagos para exportar con los filtros actuales.");
+      return;
+    }
+
+    const rows = list.map((r, i) => ({
+      "#": i + 1,
+      "Fecha": r.payment_date,
+      "Número de factura": r.invoice_number || "",
+      "Cliente": r.customer_name || "",
+      "Monto en Bs": r.amount_bs || 0,
+      "Monto en $": r.amount,
+    }));
+
+    const dailyGroups = groupTotalsByDay(list);
+    const dailyRows = dailyGroups.map((g) => ({
+      "Fecha": g.day,
+      "Cantidad de pagos": g.count,
+      "Total en Bs": g.totalBs,
+      "Total en $": g.totalUsd,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const dailyWorksheet = XLSX.utils.json_to_sheet(dailyRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Conciliación");
+    XLSX.utils.book_append_sheet(workbook, dailyWorksheet, "Totales por día");
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `conciliacion_${fecha}.xlsx`);
   });
 
   checkSession();
