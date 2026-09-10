@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliación de Pagos</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>💳 Conciliación de Pagos</h1>
+    <p class="login-sub">Ingresa con el correo y contraseña que te crearon.</p>
+    <form id="loginForm">
+      <label>
+        <span>Correo</span>
+        <input type="email" id="loginEmail" required autocomplete="username">
+      </label>
+      <label>
+        <span>Contraseña</span>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </label>
+      <button type="submit" id="loginBtn">Entrar</button>
+      <p class="login-error" id="loginError" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP PRINCIPAL ============ -->
+<div class="app" id="app" hidden>
+  <header class="app-header">
+    <h1>💳 Conciliación de Pagos</h1>
+    <div class="app-header-right">
+      <span id="userName"></span>
+      <span class="role-badge" id="roleBadge"></span>
+      <button id="logoutBtn">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ---- Cuentas de pago ---- -->
+    <section class="card">
+      <div class="card-header">
+        <h2>🏦 Cuentas de pago</h2>
+        <button id="newAccountBtn" hidden>+ Nueva cuenta</button>
+      </div>
+      <div id="accountsList" class="accounts-list"></div>
+    </section>
+
+    <!-- ---- Registrar un pago nuevo ---- -->
+    <section class="card">
+      <h2>➕ Registrar un pago</h2>
+      <form id="reconciliationForm" class="recon-form">
+        <div class="form-row">
+          <label>
+            <span>Fecha</span>
+            <input type="date" id="fieldDate" required>
+          </label>
+          <label>
+            <span>Referencia (6 dígitos) *</span>
+            <input type="text" id="fieldReference" maxlength="6" pattern="\d{6}" required placeholder="Ej: 123456">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            <span>Monto (USD) *</span>
+            <input type="number" id="fieldAmount" step="0.01" min="0.01" required placeholder="Ej: 54.50">
+          </label>
+          <label>
+            <span>Método *</span>
+            <select id="fieldType" required>
+              <option value="pago_movil">Pago Móvil</option>
+              <option value="binance">Binance</option>
+              <option value="zelle">Zelle</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            <span>Nombre del cliente</span>
+            <input type="text" id="fieldCustomerName" placeholder="Opcional">
+          </label>
+          <label>
+            <span>Teléfono del cliente</span>
+            <input type="text" id="fieldCustomerPhone" placeholder="Opcional">
+          </label>
+        </div>
+        <label>
+          <span>Nota (opcional)</span>
+          <input type="text" id="fieldNote" placeholder="Ej: pedido de la caja emprendedora">
+        </label>
+        <button type="submit" id="saveReconciliationBtn">Registrar pago</button>
+        <p class="form-message" id="reconciliationMessage" hidden></p>
+      </form>
+    </section>
+
+    <!-- ---- Historial ---- -->
+    <section class="card">
+      <div class="card-header">
+        <h2>📋 Pagos registrados</h2>
+        <input type="text" id="searchInput" placeholder="Buscar por referencia, cliente...">
+      </div>
+      <div class="table-wrap">
+        <table id="reconciliationsTable">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Referencia</th>
+              <th>Monto</th>
+              <th>Método</th>
+              <th>Cliente</th>
+              <th>Registrado por</th>
+            </tr>
+          </thead>
+          <tbody id="reconciliationsBody"></tbody>
+        </table>
+        <p class="empty-state" id="emptyState" hidden>Todavía no hay pagos registrados.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============ MODAL: nueva/editar cuenta de pago (solo master) ============ -->
+<div class="modal-overlay" id="accountModalOverlay" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="accountModalClose">✕</button>
+    <h2 id="accountModalTitle">Nueva cuenta de pago</h2>
+    <form id="accountForm">
+      <input type="hidden" id="accountFieldId">
+      <label>
+        <span>Tipo *</span>
+        <select id="accountFieldType" required>
+          <option value="pago_movil">Pago Móvil</option>
+          <option value="binance">Binance</option>
+          <option value="zelle">Zelle</option>
+          <option value="otro">Otro</option>
+        </select>
+      </label>
+      <label>
+        <span>Nombre para identificarla *</span>
+        <input type="text" id="accountFieldLabel" required placeholder="Ej: Pago Móvil Edgar">
+      </label>
+      <div class="form-row">
+        <label>
+          <span>Teléfono</span>
+          <input type="text" id="accountFieldPhone" placeholder="Opcional">
+        </label>
+        <label>
+          <span>Cédula/RIF</span>
+          <input type="text" id="accountFieldCedula" placeholder="Opcional">
+        </label>
+      </div>
+      <div class="form-row">
+        <label>
+          <span>Banco</span>
+          <input type="text" id="accountFieldBank" placeholder="Opcional">
+        </label>
+        <label>
+          <span>Correo</span>
+          <input type="text" id="accountFieldEmail" placeholder="Opcional">
+        </label>
+      </div>
+      <label>
+        <span>Titular</span>
+        <input type="text" id="accountFieldHolder" placeholder="Opcional">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="accountFieldActive" checked>
+        <span>Activa</span>
+      </label>
+      <div class="form-actions">
+        <button type="button" class="btn-danger" id="deleteAccountBtn" hidden>Eliminar</button>
+        <div class="form-actions-right">
+          <button type="button" id="cancelAccountBtn">Cancelar</button>
+          <button type="submit" id="saveAccountBtn">Guardar</button>
+        </div>
+      </div>
+      <p class="form-message" id="accountFormMessage" hidden></p>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
