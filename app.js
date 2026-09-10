@@ -36,6 +36,25 @@
     searchInput: document.getElementById("searchInput"),
     asesoraFilter: document.getElementById("asesoraFilter"),
     businessFilter: document.getElementById("businessFilter"),
+    onlyModifiedFilter: document.getElementById("onlyModifiedFilter"),
+
+    reconModalOverlay: document.getElementById("reconModalOverlay"),
+    reconModalClose: document.getElementById("reconModalClose"),
+    reconEditForm: document.getElementById("reconEditForm"),
+    reconFieldId: document.getElementById("reconFieldId"),
+    reconFieldBusiness: document.getElementById("reconFieldBusiness"),
+    reconFieldDate: document.getElementById("reconFieldDate"),
+    reconFieldInvoiceNumber: document.getElementById("reconFieldInvoiceNumber"),
+    reconFieldReference: document.getElementById("reconFieldReference"),
+    reconFieldAmountBs: document.getElementById("reconFieldAmountBs"),
+    reconFieldAmount: document.getElementById("reconFieldAmount"),
+    reconFieldType: document.getElementById("reconFieldType"),
+    reconFieldCustomerName: document.getElementById("reconFieldCustomerName"),
+    reconFieldCustomerPhone: document.getElementById("reconFieldCustomerPhone"),
+    reconFieldNote: document.getElementById("reconFieldNote"),
+    saveReconEditBtn: document.getElementById("saveReconEditBtn"),
+    cancelReconEditBtn: document.getElementById("cancelReconEditBtn"),
+    reconEditMessage: document.getElementById("reconEditMessage"),
     exportExcelBtn: document.getElementById("exportExcelBtn"),
     reconciliationsBody: document.getElementById("reconciliationsBody"),
     emptyState: document.getElementById("emptyState"),
@@ -374,6 +393,10 @@
       list = list.filter((r) => r.business === business);
     }
 
+    if (el.onlyModifiedFilter.checked) {
+      list = list.filter((r) => r.is_modified);
+    }
+
     const q = el.searchInput.value.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -399,9 +422,10 @@
     }
     el.emptyState.hidden = true;
     el.reconciliationsBody.innerHTML = list
-      .map(
-        (r) => `
-        <tr>
+      .map((r) => {
+        const canEdit = currentProfile.role === "master" || r.entered_by === currentProfile.id;
+        return `
+        <tr class="${r.is_modified ? "row-modified" : ""}">
           <td>${BUSINESS_LABELS[r.business] || "—"}</td>
           <td>${r.payment_date}</td>
           <td>${r.invoice_number || "—"}</td>
@@ -409,11 +433,14 @@
           <td>${r.amount_bs ? moneyBs(r.amount_bs) : "—"}</td>
           <td>${money(r.amount)}</td>
           <td>${TYPE_LABELS[r.payment_type]}</td>
-          <td>${r.customer_name || "—"}</td>
+          <td>${r.customer_name || "—"}
+            ${r.is_modified ? `<span class="modified-badge" title="Modificado el ${new Date(r.modified_at).toLocaleString("es-VE")}">✏️ Modificado</span>` : ""}
+          </td>
           <td>${allProfiles[r.entered_by] || "—"}</td>
+          <td>${canEdit ? `<button type="button" class="row-edit-btn" data-edit-recon="${r.id}">Editar</button>` : ""}</td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
   }
 
@@ -460,6 +487,93 @@
   el.searchInput.addEventListener("input", () => renderReconciliations());
   el.asesoraFilter.addEventListener("change", () => renderReconciliations());
   el.businessFilter.addEventListener("change", () => renderReconciliations());
+  el.onlyModifiedFilter.addEventListener("change", () => renderReconciliations());
+
+  /* ---------------------------------------------------------------
+     Editar un pago (queda marcado como "modificado" automáticamente
+     por el disparador de la base de datos)
+     --------------------------------------------------------------- */
+  el.reconciliationsBody.addEventListener("click", (e) => {
+    const editId = e.target.closest("[data-edit-recon]")?.dataset.editRecon;
+    if (!editId) return;
+    const record = allReconciliations.find((r) => r.id === editId);
+    if (record) openReconEditModal(record);
+  });
+
+  function openReconEditModal(r) {
+    el.reconEditMessage.hidden = true;
+    el.reconFieldId.value = r.id;
+    el.reconFieldBusiness.value = r.business;
+    el.reconFieldDate.value = r.payment_date;
+    el.reconFieldInvoiceNumber.value = r.invoice_number || "";
+    el.reconFieldReference.value = r.reference;
+    el.reconFieldAmountBs.value = r.amount_bs || "";
+    el.reconFieldAmount.value = r.amount;
+    el.reconFieldType.value = r.payment_type;
+    el.reconFieldCustomerName.value = r.customer_name || "";
+    el.reconFieldCustomerPhone.value = r.customer_phone || "";
+    el.reconFieldNote.value = r.note || "";
+    el.reconModalOverlay.hidden = false;
+  }
+  function closeReconEditModal() {
+    el.reconModalOverlay.hidden = true;
+  }
+  el.reconModalClose.addEventListener("click", closeReconEditModal);
+  el.cancelReconEditBtn.addEventListener("click", closeReconEditModal);
+  el.reconModalOverlay.addEventListener("click", (e) => {
+    if (e.target === el.reconModalOverlay) closeReconEditModal();
+  });
+
+  el.reconFieldReference.addEventListener("input", () => {
+    el.reconFieldReference.value = el.reconFieldReference.value.replace(/\D/g, "").slice(0, 6);
+  });
+
+  el.reconEditForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    el.reconEditMessage.hidden = true;
+
+    const reference = el.reconFieldReference.value.trim();
+    if (!/^\d{6}$/.test(reference)) {
+      showMessage(el.reconEditMessage, "La referencia debe tener exactamente 6 dígitos.", false);
+      return;
+    }
+
+    el.saveReconEditBtn.disabled = true;
+    el.saveReconEditBtn.textContent = "Guardando…";
+
+    const payload = {
+      business: el.reconFieldBusiness.value,
+      payment_date: el.reconFieldDate.value,
+      invoice_number: el.reconFieldInvoiceNumber.value.trim(),
+      reference,
+      amount_bs: parseFloat(el.reconFieldAmountBs.value) || 0,
+      amount: parseFloat(el.reconFieldAmount.value),
+      payment_type: el.reconFieldType.value,
+      customer_name: el.reconFieldCustomerName.value.trim(),
+      customer_phone: el.reconFieldCustomerPhone.value.trim(),
+      note: el.reconFieldNote.value.trim(),
+    };
+
+    const { error } = await supabaseClient
+      .from("reconciliations")
+      .update(payload)
+      .eq("id", el.reconFieldId.value);
+
+    el.saveReconEditBtn.disabled = false;
+    el.saveReconEditBtn.textContent = "Guardar cambios";
+
+    if (error) {
+      if (error.code === "23505" || /duplicate/i.test(error.message)) {
+        showMessage(el.reconEditMessage, "⚠️ Esa referencia ya está en uso por otro pago.", false);
+      } else {
+        showMessage(el.reconEditMessage, "No se pudo guardar: " + error.message, false);
+      }
+      return;
+    }
+
+    closeReconEditModal();
+    await loadReconciliations();
+  });
 
   /* ---------------------------------------------------------------
      Exportar a Excel — respeta los filtros que estén activos

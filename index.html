@@ -151,6 +151,10 @@
             <option value="">Todas las asesoras</option>
           </select>
           <input type="text" id="searchInput" placeholder="Buscar por referencia, cliente...">
+          <label class="checkbox-label inline-checkbox">
+            <input type="checkbox" id="onlyModifiedFilter">
+            <span>Solo modificados</span>
+          </label>
           <button type="button" id="exportExcelBtn">⬇ Excel</button>
         </div>
       </div>
@@ -167,6 +171,7 @@
               <th>Método</th>
               <th>Cliente</th>
               <th>Registrado por</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="reconciliationsBody"></tbody>
@@ -234,6 +239,81 @@
         </div>
       </div>
       <p class="form-message" id="accountFormMessage" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MODAL: editar pago (queda marcado como "modificado") ============ -->
+<div class="modal-overlay" id="reconModalOverlay" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="reconModalClose">✕</button>
+    <h2>Editar pago</h2>
+    <p class="modal-hint">⚠️ Al guardar, este pago quedará marcado como <strong>"Modificado"</strong> para que el master lo revise.</p>
+    <form id="reconEditForm">
+      <input type="hidden" id="reconFieldId">
+      <div class="form-row">
+        <label>
+          <span>Negocio *</span>
+          <select id="reconFieldBusiness" required>
+            <option value="mayoristas">Mayoristas</option>
+            <option value="shopicol">Shopicol</option>
+          </select>
+        </label>
+        <label>
+          <span>Fecha</span>
+          <input type="date" id="reconFieldDate" required>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>
+          <span>Número de factura</span>
+          <input type="text" id="reconFieldInvoiceNumber">
+        </label>
+        <label>
+          <span>Referencia (6 dígitos) *</span>
+          <input type="text" id="reconFieldReference" maxlength="6" pattern="\d{6}" required>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>
+          <span>Monto en Bs</span>
+          <input type="number" id="reconFieldAmountBs" step="0.01" min="0">
+        </label>
+        <label>
+          <span>Monto (USD) *</span>
+          <input type="number" id="reconFieldAmount" step="0.01" min="0.01" required>
+        </label>
+      </div>
+      <label>
+        <span>Método *</span>
+        <select id="reconFieldType" required>
+          <option value="pago_movil">Pago Móvil</option>
+          <option value="binance">Binance</option>
+          <option value="zelle">Zelle</option>
+          <option value="otro">Otro</option>
+        </select>
+      </label>
+      <div class="form-row">
+        <label>
+          <span>Nombre del cliente</span>
+          <input type="text" id="reconFieldCustomerName">
+        </label>
+        <label>
+          <span>Teléfono del cliente</span>
+          <input type="text" id="reconFieldCustomerPhone">
+        </label>
+      </div>
+      <label>
+        <span>Nota</span>
+        <input type="text" id="reconFieldNote">
+      </label>
+      <div class="form-actions">
+        <div class="form-actions-right">
+          <button type="button" id="cancelReconEditBtn">Cancelar</button>
+          <button type="submit" id="saveReconEditBtn">Guardar cambios</button>
+        </div>
+      </div>
+      <p class="form-message" id="reconEditMessage" hidden></p>
     </form>
   </div>
 </div>
